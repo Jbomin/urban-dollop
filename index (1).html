@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Projectile Motion Lab — Cosmic Final</title>
+<style>
+:root{
+  --bg:#03050d; --panel:rgba(10,18,38,.92); --panel2:rgba(15,28,56,.94);
+  --text:#f5f7ff; --muted:#a8b6d6; --border:#2a3f6d;
+  --A:#79b8ff; --B:#ff7b9e; --accent:#b8c8ff; --good:#79e0b3; --warn:#ffd166;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;color:var(--text);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(circle at 18% 8%,rgba(76,99,190,.18),transparent 28%),
+    radial-gradient(circle at 80% 20%,rgba(130,70,180,.13),transparent 31%),
+    linear-gradient(180deg,#02040b 0%,#08132a 58%,#050916 100%);
+}
+.wrap{max-width:1320px;margin:auto;padding:20px}
+h1{margin:0 0 6px;font-size:clamp(26px,4vw,42px);letter-spacing:-.03em}
+.lead{margin:0 0 16px;color:var(--muted);line-height:1.65}
+.toolbar,.card,.projectile{
+  background:var(--panel);border:1px solid var(--border);border-radius:18px;
+  backdrop-filter:blur(11px)
+}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px;margin-bottom:12px}
+button{
+  font:inherit;color:var(--text);background:#14213e;border:1px solid #35507f;
+  border-radius:10px;padding:9px 12px;cursor:pointer;transition:.16s ease
+}
+button:hover{transform:translateY(-1px);background:#1b2d50}
+button.primary{background:#eef3ff;color:#071020;border-color:#eef3ff;font-weight:800}
+button.active{outline:2px solid var(--good);background:#153b33}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(390px,.92fr);gap:12px}
+.card{padding:14px;min-width:0}
+.canvasWrap{
+  position:relative;border-radius:15px;overflow:hidden;border:1px solid #28416e;background:#02050d
+}
+canvas{display:block;width:100%;height:auto}
+.global{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+label{display:block;font-size:13px;color:var(--muted)}
+input,select{font:inherit}
+input[type=number],select{
+  width:100%;margin-top:4px;padding:8px;border:1px solid #314a78;border-radius:8px;
+  background:#0a1429;color:var(--text)
+}
+input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.projectile{padding:12px;background:var(--panel2)}
+.projectile h3{margin:0 0 8px;font-size:17px}
+.pad{display:block;width:100%;max-width:205px;margin:5px auto 8px;touch-action:none}
+.controlLine{margin:10px 0}
+.inline{display:grid;grid-template-columns:minmax(0,1fr) 88px;gap:7px;align-items:end}
+.nudge{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:5px}
+.nudge button{padding:6px 7px;font-size:12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+.stat{padding:8px;background:#081326;border:1px solid #263b63;border-radius:9px}
+.stat b{display:block;color:var(--muted);font-size:11px;margin-bottom:2px}
+.stat span{font-size:13px}
+.objectRow{display:grid;grid-template-columns:1.25fr .75fr;gap:7px;margin-bottom:8px}
+.massNote{font-size:11px;color:var(--muted);line-height:1.45;margin-top:5px}
+.syncbox{
+  margin-top:10px;padding:10px;background:#091429;border:1px solid var(--border);
+  border-radius:11px;line-height:1.5
+}
+.syncbox .top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mode-note{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.55}
+.compare{margin-top:10px;line-height:1.6}
+.good{color:var(--good);font-weight:800}.warn{color:var(--warn);font-weight:800}
+.small{font-size:12px;color:var(--muted)}
+.time{margin-top:10px}
+.legend{display:flex;flex-wrap:wrap;gap:11px;margin-top:8px;font-size:12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:5px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.switchrow{display:flex;align-items:center;gap:8px;margin-top:4px}
+.switchrow input{width:18px;height:18px}
+.airbox{
+  margin-top:10px;padding:10px;border-radius:11px;border:1px solid var(--border);
+  background:rgba(6,13,28,.8)
+}
+.airGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px}
+.physicsNote{font-size:12px;color:var(--muted);line-height:1.55;margin-top:7px}
+@media(max-width:1030px){.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.controls{grid-template-columns:1fr}.global,.objectRow,.airGrid{grid-template-columns:1fr}.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>포물선 운동 비교 실험실 · Cosmic Final</h1>
+  <p class="lead">
+    A와 B의 <b>발사 대상 · 질량 · 속도 · 각도 · 출발 위치</b>를 각각 바꿔 비교합니다.
+    각도는 0°~90°이며 <b>드래그 · 슬라이더 · 직접입력</b>을 모두 지원합니다.
+    공기저항도 ON/OFF 할 수 있습니다.
+  </p>
+
+  <div class="toolbar">
+    <button id="launch" class="primary">🚀 동시 발사</button>
+    <button id="pause">⏸ 일시정지</button>
+    <button id="reset">↺ 시간 초기화</button>
+    <button id="syncBtn">🔗 B 착지점 A와 동기화</button>
+    <span id="clock" class="small">t = 0.00 s</span>
+  </div>
+
+  <div class="layout">
+    <section>
+      <div class="card">
+        <div class="global">
+          <label>중력가속도 g (m/s²)
+            <input id="g" type="number" min="0.1" max="30" step="0.1" value="9.8">
+          </label>
+          <label>착지 기준 높이 y (m)
+            <input id="ground" type="number" min="-100" max="100" step="0.5" value="0">
+          </label>
+          <label>재생 배속
+            <select id="playback">
+              <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+            </select>
+          </label>
+          <label>공기저항
+            <div class="switchrow">
+              <input id="airToggle" type="checkbox">
+              <span id="airStatus">OFF</span>
+            </div>
+          </label>
+        </div>
+
+        <div id="airBox" class="airbox" hidden>
+          <b>공기저항 설정</b>
+          <div class="airGrid">
+            <label>공기 밀도 ρ (kg/m³)
+              <input id="rho" type="number" min="0" max="5" step="0.01" value="1.225">
+            </label>
+            <label>항력 세기 배율
+              <input id="dragScale" type="number" min="0" max="5" step="0.1" value="1">
+            </label>
+          </div>
+          <div class="physicsNote">
+            ON일 때는 이차항력 \(F_d=\frac12\rho C_d A v^2\)을 수치적으로 계산합니다.
+            따라서 같은 속도·각도라도 <b>질량과 물체의 크기/형상</b>에 따라 궤적이 달라집니다.
+          </div>
+        </div>
+
+        <div class="canvasWrap">
+          <canvas id="canvas" width="940" height="580" aria-label="우주 배경의 포물선 운동 비교 그래프"></canvas>
+        </div>
+
+        <div class="time">
+          <label>시간 직접 이동 <span id="timeOut" style="color:var(--text);font-weight:700">0.00 s</span></label>
+          <input id="timeSlider" type="range" min="0" max="10" step="0.01" value="0">
+        </div>
+
+        <div class="legend">
+          <span><i class="dot" style="background:var(--A)"></i>A 궤적</span>
+          <span><i class="dot" style="background:var(--B)"></i>B 궤적</span>
+          <span>✦ 반짝이는 별</span>
+          <span>〰 움직이는 오로라</span>
+          <span>☄️ 발사체 빛 꼬리</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <b>물리 모델 안내</b>
+        <p class="small" style="line-height:1.65;margin-bottom:0">
+          공기저항 OFF에서는 질량과 발사체 종류가 궤적에 영향을 주지 않습니다.
+          공기저항 ON에서는 물체별 항력계수와 단면적을 사용하므로 질량·크기·형상에 따라 운동이 달라집니다.
+          행성은 실제 행성의 질량/반지름을 그대로 쓰는 것이 아니라 <b>시각적 테마</b>이며, 실험 질량은 오른쪽에서 별도로 설정합니다.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <div class="controls">
+        <div class="projectile">
+          <h3 style="color:var(--A)">● 포물체 A</h3>
+
+          <div class="objectRow">
+            <label>발사 대상
+              <select id="objectA">
+                <optgroup label="우주 오브젝트">
+                  <option value="smallplanet">🪐 작은 행성</option>
+                  <option value="asteroid">☄️ 소행성</option>
+                  <option value="satellite">🛰️ 인공위성</option>
+                  <option value="energy" selected>⭐ 에너지 구체</option>
+                  <option value="capsule">🚀 우주 캡슐</option>
+                </optgroup>
+                <optgroup label="태양계 행성">
+                  <option value="mercury">수성</option>
+                  <option value="venus">금성</option>
+                  <option value="earth">지구</option>
+                  <option value="mars">화성</option>
+                  <option value="jupiter">목성</option>
+                  <option value="saturn">토성</option>
+                  <option value="uranus">천왕성</option>
+                  <option value="neptune">해왕성</option>
+                </optgroup>
+                <option value="moon">🌙 달</option>
+              </select>
+            </label>
+            <label>질량
+              <select id="massPresetA">
+                <option value="0.2">0.2 kg</option>
+                <option value="1" selected>1 kg</option>
+                <option value="3">3 kg</option>
+                <option value="5">5 kg</option>
+                <option value="10">10 kg</option>
+              </select>
+            </label>
+          </div>
+
+          <svg id="padA" class="pad" viewBox="0 0 220 220" aria-label="A 드래그 조절판">
+            <path d="M18 202 A184 184 0 0 1 202 18" fill="none" stroke="#314262" stroke-width="2"/>
+            <line x1="18" y1="202" x2="202" y2="202" stroke="#314262"/>
+            <line x1="18" y1="202" x2="18" y2="18" stroke="#314262"/>
+            <path d="M18 202 L202 202 A184 184 0 0 0 18 18 Z" fill="#071123" opacity=".85"/>
+            <line id="arrowA" x1="18" y1="202" x2="130" y2="120" stroke="#79b8ff" stroke-width="5"/>
+            <circle id="handleA" cx="130" cy="120" r="11" fill="#79b8ff"/>
+            <text x="108" y="216" text-anchor="middle" font-size="11" fill="#9aa8c7">↗ 끌어서 속도 + 각도</text>
+          </svg>
+
+          <div class="controlLine">
+            <div class="inline">
+              <label>속도 v = <span id="vAOut" style="color:var(--text);font-weight:700"></span> m/s
+                <input id="vA" type="range" min="0" max="100" step="0.1" value="25">
+              </label>
+              <label>직접입력<input id="vAInput" type="number" min="0" max="100" step="0.1" value="25"></label>
+            </div>
+            <div class="nudge"><button data-nudge="vA:-0.5">−0.5 m/s</button><button data-nudge="vA:0.5">+0.5 m/s</button></div>
+          </div>
+
+          <div class="controlLine">
+            <div class="inline">
+              <label>각도 θ = <span id="angAOut" style="color:var(--text);font-weight:700"></span>°
+                <input id="angA" type="range" min="0" max="90" step="0.1" value="35">
+              </label>
+              <label>직접입력<input id="angAInput" type="number" min="0" max="90" step="0.1" value="35"></label>
+            </div>
+            <div class="nudge"><button data-nudge="angA:-0.5">−0.5°</button><button data-nudge="angA:0.5">+0.5°</button></div>
+          </div>
+
+          <div class="row">
+            <label>출발 x₀<input id="xA" type="number" step="0.5" value="0"></label>
+            <label>출발 y₀<input id="yA" type="number" step="0.5" value="0"></label>
+          </div>
+          <div class="stats" id="statsA"></div>
+        </div>
+
+        <div class="projectile">
+          <h3 style="color:var(--B)">● 포물체 B</h3>
+
+          <div class="objectRow">
+            <label>발사 대상
+              <select id="objectB">
+                <optgroup label="우주 오브젝트">
+                  <option value="smallplanet">🪐 작은 행성</option>
+                  <option value="asteroid" selected>☄️ 소행성</option>
+                  <option value="satellite">🛰️ 인공위성</option>
+                  <option value="energy">⭐ 에너지 구체</option>
+                  <option value="capsule">🚀 우주 캡슐</option>
+                </optgroup>
+                <optgroup label="태양계 행성">
+                  <option value="mercury">수성</option>
+                  <option value="venus">금성</option>
+                  <option value="earth">지구</option>
+                  <option value="mars">화성</option>
+                  <option value="jupiter">목성</option>
+                  <option value="saturn">토성</option>
+                  <option value="uranus">천왕성</option>
+                  <option value="neptune">해왕성</option>
+                </optgroup>
+                <option value="moon">🌙 달</option>
+              </select>
+            </label>
+            <label>질량
+              <select id="massPresetB">
+                <option value="0.2">0.2 kg</option>
+                <option value="1">1 kg</option>
+                <option value="3" selected>3 kg</option>
+                <option value="5">5 kg</option>
+                <option value="10">10 kg</option>
+              </select>
+            </label>
+          </div>
+
+          <svg id="padB" class="pad" viewBox="0 0 220 220" aria-label="B 드래그 조절판">
+            <path d="M18 202 A184 184 0 0 1 202 18" fill="none" stroke="#314262" stroke-width="2"/>
+            <line x1="18" y1="202" x2="202" y2="202" stroke="#314262"/>
+            <line x1="18" y1="202" x2="18" y2="18" stroke="#314262"/>
+            <path d="M18 202 L202 202 A184 184 0 0 0 18 18 Z" fill="#071123" opacity=".85"/>
+            <line id="arrowB" x1="18" y1="202" x2="100" y2="70" stroke="#ff7b9e" stroke-width="5"/>
+            <circle id="handleB" cx="100" cy="70" r="11" fill="#ff7b9e"/>
+            <text x="108" y="216" text-anchor="middle" font-size="11" fill="#9aa8c7">↗ 자유모드: 속도+각도 / 동기화: 각도</text>
+          </svg>
+
+          <div class="controlLine">
+            <div class="inline">
+              <label>속도 v = <span id="vBOut" style="color:var(--text);font-weight:700"></span> m/s
+                <input id="vB" type="range" min="0" max="100" step="0.1" value="25">
+              </label>
+              <label>직접입력<input id="vBInput" type="number" min="0" max="100" step="0.1" value="25"></label>
+            </div>
+            <div class="nudge"><button data-nudge="vB:-0.5">−0.5 m/s</button><button data-nudge="vB:0.5">+0.5 m/s</button></div>
+          </div>
+
+          <div class="controlLine">
+            <div class="inline">
+              <label>각도 θ = <span id="angBOut" style="color:var(--text);font-weight:700"></span>°
+                <input id="angB" type="range" min="0" max="90" step="0.1" value="60">
+              </label>
+              <label>직접입력<input id="angBInput" type="number" min="0" max="90" step="0.1" value="60"></label>
+            </div>
+            <div class="nudge"><button data-nudge="angB:-0.5">−0.5°</button><button data-nudge="angB:0.5">+0.5°</button></div>
+          </div>
+
+          <div class="row">
+            <label>출발 x₀<input id="xB" type="number" step="0.5" value="0"></label>
+            <label>출발 y₀<input id="yB" type="number" step="0.5" value="0"></label>
+          </div>
+
+          <div class="syncbox">
+            <div class="top">
+              <b>착지점 동기화</b>
+              <span id="syncStatus" class="small">OFF</span>
+            </div>
+            <div id="syncNote" class="mode-note">
+              자유 모드에서는 속도와 각도를 모두 직접 조절합니다.
+            </div>
+          </div>
+
+          <div class="stats" id="statsB"></div>
+        </div>
+      </div>
+
+      <div class="card compare" id="compare"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  const E={
+    launch:$('launch'),pause:$('pause'),reset:$('reset'),syncBtn:$('syncBtn'),clock:$('clock'),
+    g:$('g'),ground:$('ground'),playback:$('playback'),airToggle:$('airToggle'),airStatus:$('airStatus'),
+    airBox:$('airBox'),rho:$('rho'),dragScale:$('dragScale'),
+    canvas:$('canvas'),slider:$('timeSlider'),timeOut:$('timeOut'),
+    objectA:$('objectA'),massA:$('massPresetA'),vA:$('vA'),vAInput:$('vAInput'),angA:$('angA'),angAInput:$('angAInput'),xA:$('xA'),yA:$('yA'),vAOut:$('vAOut'),angAOut:$('angAOut'),
+    objectB:$('objectB'),massB:$('massPresetB'),vB:$('vB'),vBInput:$('vBInput'),angB:$('angB'),angBInput:$('angBInput'),xB:$('xB'),yB:$('yB'),vBOut:$('vBOut'),angBOut:$('angBOut'),
+    padA:$('padA'),padB:$('padB'),handleA:$('handleA'),handleB:$('handleB'),arrowA:$('arrowA'),arrowB:$('arrowB'),
+    statsA:$('statsA'),statsB:$('statsB'),compare:$('compare'),syncStatus:$('syncStatus'),syncNote:$('syncNote')
+  };
+  const ctx=E.canvas.getContext('2d');
+  let t=0,running=false,last=performance.now(),syncLanding=false;
+  const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const n=(el,f=0)=>{const v=Number(el.value);return Number.isFinite(v)?v:f};
+
+  const objectPhysics={
+    energy:{cd:.47,area:.020},
+    asteroid:{cd:.80,area:.030},
+    satellite:{cd:1.15,area:.040},
+    capsule:{cd:.70,area:.028},
+    smallplanet:{cd:.47,area:.035},
+    mercury:{cd:.47,area:.025},venus:{cd:.47,area:.028},earth:{cd:.47,area:.030},
+    mars:{cd:.47,area:.026},jupiter:{cd:.47,area:.045},saturn:{cd:.55,area:.050},
+    uranus:{cd:.47,area:.036},neptune:{cd:.47,area:.036},moon:{cd:.47,area:.024}
+  };
+
+  // deterministic star field
+  const stars=[]; let seed=481516;
+  function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+  for(let i=0;i<175;i++)stars.push({x:rnd(),y:rnd(),r:.4+rnd()*1.6,p:rnd()*Math.PI*2,s:.6+rnd()*2.0});
+
+  function setPair(prefix,kind,value){
+    if(kind==='v'){
+      value=clamp(value,0,100);
+      E['v'+prefix].value=value;E['v'+prefix+'Input'].value=Number(value).toFixed(1);
+    }else{
+      value=clamp(value,0,90);
+      E['ang'+prefix].value=value;E['ang'+prefix+'Input'].value=Number(value).toFixed(1);
+    }
+  }
+
+  function projectile(prefix){
+    const v=n(E['v'+prefix]),ang=clamp(n(E['ang'+prefix]),0,90),object=E['object'+prefix].value,mass=Math.max(.05,n(E['mass'+prefix],1));
+    const phys=objectPhysics[object]||objectPhysics.energy;
+    return {
+      x0:n(E['x'+prefix]),y0:n(E['y'+prefix]),v,ang,
+      vx:v*Math.cos(rad(ang)),vy:v*Math.sin(rad(ang)),
+      object,mass,cd:phys.cd,area:phys.area
+    };
+  }
+
+  function integrate(P,g,ground,airOn,rho,dragScale,maxTime=60){
+    const dt=.008;
+    let x=P.x0,y=P.y0,vx=P.vx,vy=P.vy,tt=0;
+    const pts=[{t:0,x,y,vx,vy}];
+    let maxY=y;
+    const kBase=.5*rho*P.cd*P.area*dragScale/P.mass;
+    let landed=false;
+    while(tt<maxTime){
+      const speed=Math.hypot(vx,vy);
+      let ax=0,ay=-g;
+      if(airOn && speed>1e-9){
+        ax += -kBase*speed*vx;
+        ay += -kBase*speed*vy;
+      }
+      // semi-implicit Euler is stable enough for this educational simulator
+      vx += ax*dt;
+      vy += ay*dt;
+      x += vx*dt;
+      y += vy*dt;
+      tt += dt;
+      if(y>maxY)maxY=y;
+      pts.push({t:tt,x,y,vx,vy});
+      if(tt>.01 && y<=ground && vy<0){
+        landed=true;
+        break;
+      }
+      if(Math.abs(x)>2e5 || y>2e5 || y<-2e5)break;
+    }
+    // interpolate landing between last two samples
+    let T=null,xf=null;
+    if(landed && pts.length>=2){
+      const b=pts[pts.length-1],a=pts[pts.length-2];
+      const denom=(a.y-b.y);
+      const u=Math.abs(denom)>1e-12 ? (a.y-ground)/denom : 1;
+      T=a.t+(b.t-a.t)*clamp(u,0,1);
+      xf=a.x+(b.x-a.x)*clamp(u,0,1);
+    }
+    return {...P,T,xf,dx:xf==null?null:xf-P.x0,maxY,pts};
+  }
+
+  function rawState(){
+    const g=Math.max(.01,n(E.g,9.8)),ground=n(E.ground),airOn=E.airToggle.checked;
+    const rho=Math.max(0,n(E.rho,1.225)),dragScale=Math.max(0,n(E.dragScale,1));
+    return {
+      g,ground,airOn,rho,dragScale,
+      A:integrate(projectile('A'),g,ground,airOn,rho,dragScale),
+      B:integrate(projectile('B'),g,ground,airOn,rho,dragScale)
+    };
+  }
+
+  function findSpeedForTarget(prefix,targetX,S){
+    const angle=n(E['ang'+prefix]),x0=n(E['x'+prefix]),y0=n(E['y'+prefix]);
+    const object=E['object'+prefix].value,mass=Math.max(.05,n(E['mass'+prefix],1));
+    const phys=objectPhysics[object]||objectPhysics.energy;
+    let best=null,bestErr=Infinity;
+    // robust grid + local refinement, works with or without drag
+    const evalV=(v)=>{
+      const P={x0,y0,v,ang:angle,vx:v*Math.cos(rad(angle)),vy:v*Math.sin(rad(angle)),object,mass,cd:phys.cd,area:phys.area};
+      return integrate(P,S.g,S.ground,S.airOn,S.rho,S.dragScale,60);
+    };
+    for(let i=0;i<=500;i++){
+      const v=100*i/500;
+      const R=evalV(v);
+      if(R.xf==null)continue;
+      const err=Math.abs(R.xf-targetX);
+      if(err<bestErr){bestErr=err;best=v}
+    }
+    if(best==null)return null;
+    let lo=Math.max(0,best-2),hi=Math.min(100,best+2);
+    for(let k=0;k<30;k++){
+      const v1=lo+(hi-lo)/3,v2=hi-(hi-lo)/3;
+      const r1=evalV(v1),r2=evalV(v2);
+      const e1=r1.xf==null?1e9:Math.abs(r1.xf-targetX),e2=r2.xf==null?1e9:Math.abs(r2.xf-targetX);
+      if(e1<e2)hi=v2;else lo=v1;
+    }
+    const v=(lo+hi)/2,R=evalV(v);
+    return R.xf!=null&&Math.abs(R.xf-targetX)<.25?v:null;
+  }
+
+  function applySync(){
+    if(!syncLanding)return;
+    const S=rawState(),target=S.A.xf;
+    if(target==null){
+      E.syncNote.innerHTML='<span class="warn">A가 착지선에 도달하지 않아 동기화할 수 없습니다.</span>';
+      return;
+    }
+    const v=findSpeedForTarget('B',target,S);
+    if(v==null){
+      E.syncNote.innerHTML='<span class="warn">현재 B 각도와 조건에서는 0~100 m/s 범위에서 A 착지점에 맞추기 어렵습니다.</span>';
+      return;
+    }
+    setPair('B','v',v);
+    E.syncNote.innerHTML=`<span class="good">A 착지 x = ${target.toFixed(2)} m에 동기화 중</span><br>B 각도를 바꾸면 필요한 속도를 자동 계산합니다.`;
+  }
+
+  function state(){applySync();return rawState()}
+
+  function sampleAt(P,tt){
+    const pts=P.pts;
+    if(!pts.length)return{x:P.x0,y:P.y0,vx:P.vx,vy:P.vy};
+    if(tt<=0)return pts[0];
+    if(P.T!=null && tt>=P.T){
+      const q=pts[pts.length-1]; return {...q,y:n(E.ground)};
+    }
+    let lo=0,hi=pts.length-1;
+    while(lo<hi){
+      const mid=(lo+hi)>>1;
+      if(pts[mid].t<tt)lo=mid+1;else hi=mid;
+    }
+    const b=pts[lo],a=pts[Math.max(0,lo-1)];
+    const u=(b.t-a.t)>1e-9?(tt-a.t)/(b.t-a.t):0;
+    return {
+      t:tt,x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u,
+      vx:a.vx+(b.vx-a.vx)*u,vy:a.vy+(b.vy-a.vy)*u
+    };
+  }
+
+  function syncPad(prefix){
+    const v=n(E['v'+prefix]),ang=n(E['ang'+prefix]),R=178*(v/100),a=rad(ang);
+    const x=18+R*Math.cos(a),y=202-R*Math.sin(a);
+    E['handle'+prefix].setAttribute('cx',x);E['handle'+prefix].setAttribute('cy',y);
+    E['arrow'+prefix].setAttribute('x2',x);E['arrow'+prefix].setAttribute('y2',y);
+    E['v'+prefix+'Out'].textContent=v.toFixed(1);E['ang'+prefix+'Out'].textContent=ang.toFixed(1);
+    E['v'+prefix+'Input'].value=v.toFixed(1);E['ang'+prefix+'Input'].value=ang.toFixed(1);
+  }
+
+  function bindPad(prefix){
+    const svg=E['pad'+prefix]; let drag=false;
+    function change(ev){
+      const r=svg.getBoundingClientRect();
+      const x=(ev.clientX-r.left)/r.width*220,y=(ev.clientY-r.top)/r.height*220;
+      let dx=Math.max(0,x-18),dy=Math.max(0,202-y);
+      const R=Math.min(178,Math.hypot(dx,dy));
+      const ang=clamp(deg(Math.atan2(dy,dx)),0,90);
+      setPair(prefix,'ang',ang);
+      if(!(prefix==='B'&&syncLanding))setPair(prefix,'v',R/178*100);
+      resetTime();
+    }
+    svg.addEventListener('pointerdown',ev=>{drag=true;svg.setPointerCapture(ev.pointerId);change(ev)});
+    svg.addEventListener('pointermove',ev=>{if(drag)change(ev)});
+    svg.addEventListener('pointerup',()=>drag=false);
+    svg.addEventListener('pointercancel',()=>drag=false);
+  }
+
+  function view(A,B,ground){
+    const pts=[...A.pts,...B.pts,{x:A.x0,y:A.y0},{x:B.x0,y:B.y0},{x:0,y:ground}];
+    const xs=pts.map(p=>p.x).filter(Number.isFinite),ys=pts.map(p=>p.y).filter(Number.isFinite);
+    let minX=Math.min(...xs,-5),maxX=Math.max(...xs,20),minY=Math.min(...ys,ground,-2),maxY=Math.max(...ys,10);
+    const px=(maxX-minX)*.12+1,py=(maxY-minY)*.15+1;
+    return{minX:minX-px,maxX:maxX+px,minY:minY-py,maxY:maxY+py};
+  }
+
+  function mapper(vp){
+    const pad=45,W=E.canvas.width,H=E.canvas.height,s=Math.min((W-2*pad)/(vp.maxX-vp.minX),(H-2*pad)/(vp.maxY-vp.minY));
+    const w=(vp.maxX-vp.minX)*s,h=(vp.maxY-vp.minY)*s,ox=(W-w)/2,oy=(H-h)/2;
+    return{X:x=>ox+(x-vp.minX)*s,Y:y=>H-(oy+(y-vp.minY)*s),S:s}
+  }
+
+  function nice(span){const p=10**Math.floor(Math.log10(Math.max(span,1e-6))),q=span/p;return(q<2?.2:q<5?.5:1)*p}
+
+  function drawSpace(ms){
+    const W=E.canvas.width,H=E.canvas.height;
+    const bg=ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#02040b');bg.addColorStop(.55,'#07132b');bg.addColorStop(1,'#091021');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+    const tt=ms*0.00022;
+    ctx.save();ctx.globalCompositeOperation='screen';
+    for(let band=0;band<3;band++){
+      const grad=ctx.createLinearGradient(0,0,W,0);
+      grad.addColorStop(0,'rgba(66,255,203,0)');
+      grad.addColorStop(.22,'rgba(66,255,203,.15)');
+      grad.addColorStop(.52,'rgba(142,112,255,.20)');
+      grad.addColorStop(.78,'rgba(86,218,255,.14)');
+      grad.addColorStop(1,'rgba(86,218,255,0)');
+      ctx.strokeStyle=grad;ctx.lineWidth=28+band*13;
+      ctx.shadowColor=band===1?'rgba(144,112,255,.28)':'rgba(70,255,210,.22)';ctx.shadowBlur=30;
+      ctx.beginPath();
+      for(let x=-70;x<=W+70;x+=18){
+        const y=58+band*24+Math.sin(x*.010+tt*(1+band*.13)+band)*18+Math.sin(x*.004-tt*.7)*10;
+        if(x===-70)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    for(const s of stars){
+      const tw=.45+.55*(.5+.5*Math.sin(ms*.002*s.s+s.p));
+      ctx.fillStyle=`rgba(255,255,255,${.22+.76*tw})`;
+      ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*(.65+.45*tw),0,Math.PI*2);ctx.fill();
+      if(s.r>1.35&&tw>.73){
+        ctx.strokeStyle=`rgba(255,255,255,${.17*tw})`;ctx.lineWidth=.7;
+        ctx.beginPath();ctx.moveTo(s.x*W-4,s.y*H);ctx.lineTo(s.x*W+4,s.y*H);
+        ctx.moveTo(s.x*W,s.y*H-4);ctx.lineTo(s.x*W,s.y*H+4);ctx.stroke();
+      }
+    }
+  }
+
+  function objectRadius(mass){return clamp(6+3.15*Math.sqrt(Math.max(.05,mass)),6,18)}
+
+  function sphereGradient(r,inner,outer){
+    const g=ctx.createRadialGradient(-r*.35,-r*.35,1,0,0,r);
+    g.addColorStop(0,inner);g.addColorStop(1,outer);return g
+  }
+
+  function drawObject(type,x,y,r,color,angle=0){
+    ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.shadowBlur=12;
+    const orb=(inner,outer,stroke=null)=>{
+      ctx.fillStyle=sphereGradient(r,inner,outer);ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+      if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}
+    };
+    if(type==='energy'){
+      ctx.shadowColor=color;
+      const g=ctx.createRadialGradient(-r*.25,-r*.25,1,0,0,r);
+      g.addColorStop(0,'#fff');g.addColorStop(.23,color);g.addColorStop(.7,'rgba(117,110,255,.65)');g.addColorStop(1,'rgba(42,25,105,.15)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.68)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,r*.72,0,Math.PI*2);ctx.stroke();
+    }else if(type==='asteroid'){
+      ctx.shadowColor='#d3d8e1';ctx.fillStyle='#8c96a7';ctx.strokeStyle='#d8dee8';ctx.lineWidth=1.1;
+      ctx.beginPath();
+      for(let i=0;i<10;i++){const a=i/10*Math.PI*2,rr=r*(.78+((i*37)%10)/33);const px=Math.cos(a)*rr,py=Math.sin(a)*rr;i?ctx.lineTo(px,py):ctx.moveTo(px,py)}
+      ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='rgba(46,52,63,.52)';
+      [[-.28,-.15,.18],[.23,.22,.12],[.1,-.35,.1]].forEach(c=>{ctx.beginPath();ctx.arc(r*c[0],r*c[1],r*c[2],0,Math.PI*2);ctx.fill()});
+    }else if(type==='satellite'){
+      ctx.shadowColor='#85b7ff';ctx.shadowBlur=7;
+      ctx.fillStyle='#c7d1df';ctx.fillRect(-r*.43,-r*.35,r*.86,r*.70);
+      ctx.fillStyle='#426ca9';ctx.fillRect(-r*1.35,-r*.28,r*.78,r*.56);ctx.fillRect(r*.57,-r*.28,r*.78,r*.56);
+      ctx.strokeStyle='#d7e8ff';ctx.lineWidth=1;ctx.strokeRect(-r*1.35,-r*.28,r*.78,r*.56);ctx.strokeRect(r*.57,-r*.28,r*.78,r*.56);
+      ctx.strokeStyle='#dfe7f3';ctx.beginPath();ctx.moveTo(0,-r*.35);ctx.lineTo(0,-r*.85);ctx.stroke();
+    }else if(type==='capsule'){
+      ctx.shadowColor='#e7f0ff';ctx.fillStyle='#e8eef7';ctx.strokeStyle='#91aac8';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(-r*.8,r*.5);ctx.quadraticCurveTo(-r*.92,-r*.5,0,-r);ctx.quadraticCurveTo(r*.92,-r*.5,r*.8,r*.5);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(0,-r*.25,r*.27,0,Math.PI*2);ctx.fill();
+    }else if(type==='smallplanet'){
+      orb('#f5d97c','#73522e','#ffe5a0');
+      ctx.strokeStyle='rgba(230,205,150,.8)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.ellipse(0,0,r*1.45,r*.42,-.28,0,Math.PI*2);ctx.stroke();
+    }else if(type==='mercury'){
+      orb('#d8d4ce','#76736f','#bdb9b2');
+      ctx.fillStyle='rgba(80,77,74,.35)';ctx.beginPath();ctx.arc(-r*.2,-r*.1,r*.18,0,Math.PI*2);ctx.fill();
+    }else if(type==='venus'){
+      orb('#ffe19a','#b66e2c','#ffd58b');
+      ctx.strokeStyle='rgba(255,244,195,.5)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,r*.7,.2,2.7);ctx.stroke();
+    }else if(type==='earth'){
+      orb('#b9edff','#1f6db5','#9adfff');
+      ctx.fillStyle='#56a85c';
+      ctx.beginPath();ctx.ellipse(-r*.18,-r*.05,r*.32,r*.18,.4,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.ellipse(r*.25,r*.15,r*.22,r*.13,-.5,0,Math.PI*2);ctx.fill();
+    }else if(type==='mars'){
+      orb('#ffb07c','#9b3d27','#ff9a6e');
+      ctx.fillStyle='rgba(95,35,24,.34)';ctx.beginPath();ctx.arc(-r*.2,r*.18,r*.15,0,Math.PI*2);ctx.fill();
+    }else if(type==='jupiter'){
+      orb('#ffe0b0','#a86f4d','#f4c28f');
+      ctx.strokeStyle='rgba(125,75,50,.55)';ctx.lineWidth=2;
+      for(let yy=-.45;yy<=.45;yy+=.3){ctx.beginPath();ctx.moveTo(-r*.85,r*yy);ctx.lineTo(r*.85,r*yy);ctx.stroke()}
+      ctx.fillStyle='#b74b35';ctx.beginPath();ctx.ellipse(r*.3,r*.18,r*.22,r*.12,0,0,Math.PI*2);ctx.fill();
+    }else if(type==='saturn'){
+      orb('#ffe7a8','#b69057','#f8d989');
+      ctx.strokeStyle='#d9bf8b';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(0,0,r*1.65,r*.45,-.18,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle='rgba(255,241,195,.75)';ctx.lineWidth=1.2;ctx.beginPath();ctx.ellipse(0,0,r*1.9,r*.58,-.18,0,Math.PI*2);ctx.stroke();
+    }else if(type==='uranus'){
+      orb('#d5ffff','#56aeb8','#c9ffff');
+      ctx.strokeStyle='rgba(205,255,255,.65)';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(0,0,r*1.45,r*.32,.16,0,Math.PI*2);ctx.stroke();
+    }else if(type==='neptune'){
+      orb('#9fc5ff','#214a9b','#7fb2ff');
+      ctx.strokeStyle='rgba(200,220,255,.45)';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(0,0,r*.7,2.9,5.8);ctx.stroke();
+    }else if(type==='moon'){
+      orb('#f2f2ed','#8e9298','#dadde2');
+      ctx.fillStyle='rgba(80,83,88,.32)';
+      [[-.25,-.18,.16],[.22,.2,.12],[.1,-.36,.09]].forEach(c=>{ctx.beginPath();ctx.arc(r*c[0],r*c[1],r*c[2],0,Math.PI*2);ctx.fill()});
+    }else{
+      orb('#ffffff',color,color);
+    }
+    ctx.restore();
+  }
+
+  function draw(ms){
+    const S=state(),{A,B,ground}=S;syncPad('A');syncPad('B');
+    const end=Math.max(A.T||0,B.T||0,1);
+    E.slider.max=end.toFixed(2);if(t>end)t=end;E.slider.value=t;E.timeOut.textContent=t.toFixed(2)+' s';E.clock.textContent='t = '+t.toFixed(2)+' s';
+
+    drawSpace(ms);
+    const vp=view(A,B,ground),m=mapper(vp);
+
+    ctx.save();ctx.strokeStyle='rgba(126,158,215,.13)';ctx.fillStyle='rgba(210,222,246,.48)';ctx.lineWidth=1;ctx.font='11px system-ui';
+    const dx=nice(vp.maxX-vp.minX),dy=nice(vp.maxY-vp.minY);
+    for(let x=Math.ceil(vp.minX/dx)*dx;x<=vp.maxX;x+=dx){const X=m.X(x);ctx.beginPath();ctx.moveTo(X,0);ctx.lineTo(X,E.canvas.height);ctx.stroke();ctx.fillText(x.toFixed(0),X+3,E.canvas.height-6)}
+    for(let y=Math.ceil(vp.minY/dy)*dy;y<=vp.maxY;y+=dy){const Y=m.Y(y);ctx.beginPath();ctx.moveTo(0,Y);ctx.lineTo(E.canvas.width,Y);ctx.stroke();ctx.fillText(y.toFixed(0),4,Y-4)}
+    ctx.restore();
+
+    ctx.strokeStyle='rgba(223,232,251,.82)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,m.Y(ground));ctx.lineTo(E.canvas.width,m.Y(ground));ctx.stroke();
+
+    function trace(P,color){
+      if(!P.pts.length)return;
+      ctx.save();ctx.strokeStyle=color;ctx.lineWidth=3;ctx.shadowColor=color;ctx.shadowBlur=12;ctx.beginPath();
+      P.pts.forEach((q,i)=>{const X=m.X(q.x),Y=m.Y(q.y);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});
+      ctx.stroke();ctx.restore();
+    }
+    trace(A,'#79b8ff');trace(B,'#ff7b9e');
+
+    function moving(P,color,label){
+      const tt=P.T==null?t:Math.min(t,P.T),q=sampleAt(P,tt),X=m.X(q.x),Y=m.Y(q.y),ang=Math.atan2(-q.vy,q.vx);
+      if(running && tt>0 && (P.T==null||tt<P.T)){
+        ctx.save();ctx.globalAlpha=.38;ctx.fillStyle=color;
+        for(let k=1;k<=5;k++){
+          const px=X-q.vx*m.S*.010*k,py=Y+q.vy*m.S*.010*k;
+          ctx.beginPath();ctx.arc(px,py,Math.max(1,4.2-k*.65),0,Math.PI*2);ctx.fill();
+        }
+        ctx.restore();
+      }
+      drawObject(P.object,X,Y,objectRadius(P.mass),color,ang);
+      ctx.fillStyle=color;ctx.font='bold 13px system-ui';ctx.fillText(label,X+14,Y-12);
+    }
+    moving(A,'#79b8ff','A');moving(B,'#ff7b9e','B');
+    renderStats(A,B,S.airOn);
+  }
+
+  const fmt=(v,d=2)=>v==null?'—':Number(v).toFixed(d);
+  function statHTML(P){return`
+    <div class="stat"><b>vx</b><span>${fmt(P.vx)} m/s</span></div>
+    <div class="stat"><b>vy</b><span>${fmt(P.vy)} m/s</span></div>
+    <div class="stat"><b>비행시간</b><span>${fmt(P.T)} s</span></div>
+    <div class="stat"><b>최고높이</b><span>${fmt(P.maxY)} m</span></div>
+    <div class="stat"><b>수평변위</b><span>${fmt(P.dx)} m</span></div>
+    <div class="stat"><b>도착 x</b><span>${fmt(P.xf)} m</span></div>`}
+  function renderStats(A,B,airOn){
+    E.statsA.innerHTML=statHTML(A);E.statsB.innerHTML=statHTML(B);
+    const dr=A.xf!=null&&B.xf!=null?Math.abs(A.xf-B.xf):null,dt=A.T!=null&&B.T!=null?Math.abs(A.T-B.T):null;
+    let msg='';
+    if(dr!=null&&dr<.08){
+      msg=`<span class="good">착지점이 거의 같습니다.</span>`;
+      if(dt!=null)msg+=` 비행시간은 ${fmt(dt)} s 차이납니다.`;
+    }else{
+      msg='자유롭게 조건을 바꾸거나 착지점 동기화를 켜서 같은 도착점의 두 궤적을 비교해 보세요.';
+    }
+    E.compare.innerHTML=`<b>현재 비교 · ${airOn?'공기저항 ON':'공기저항 OFF'}</b><br>도착 x 차이 <b>${fmt(dr)} m</b> · 비행시간 차이 <b>${fmt(dt)} s</b> · 각도 차이 <b>${fmt(Math.abs(A.ang-B.ang),1)}°</b><br>${msg}`;
+  }
+
+  function resetTime(){t=0;running=false}
+  function loop(ms){
+    const dt=Math.min((ms-last)/1000,.05)*n(E.playback,1);last=ms;
+    if(running){
+      t+=dt;
+      const S=state(),end=Math.max(S.A.T||0,S.B.T||0,1);
+      if(t>=end){t=end;running=false}
+    }
+    draw(ms);
+    requestAnimationFrame(loop);
+  }
+
+  E.launch.addEventListener('click',()=>{t=0;running=true});
+  E.pause.addEventListener('click',()=>running=false);
+  E.reset.addEventListener('click',resetTime);
+  E.slider.addEventListener('input',()=>{running=false;t=n(E.slider)});
+
+  E.syncBtn.addEventListener('click',()=>{
+    syncLanding=!syncLanding;
+    E.syncBtn.classList.toggle('active',syncLanding);
+    E.syncStatus.textContent=syncLanding?'ON':'OFF';
+    E.vB.disabled=syncLanding;E.vBInput.disabled=syncLanding;
+    E.syncNote.textContent=syncLanding?'A의 착지점을 기준으로 B의 속도를 자동 계산합니다. B 각도는 자유롭게 조절하세요.':'자유 모드에서는 속도와 각도를 모두 직접 조절합니다.';
+    resetTime();
+  });
+
+  E.airToggle.addEventListener('change',()=>{
+    E.airBox.hidden=!E.airToggle.checked;
+    E.airStatus.textContent=E.airToggle.checked?'ON':'OFF';
+    resetTime();
+  });
+
+  ['A','B'].forEach(p=>{
+    E['v'+p].addEventListener('input',()=>{if(!(p==='B'&&syncLanding)){setPair(p,'v',n(E['v'+p]));resetTime()}});
+    E['v'+p+'Input'].addEventListener('input',()=>{if(!(p==='B'&&syncLanding)){setPair(p,'v',n(E['v'+p+'Input']));resetTime()}});
+    E['ang'+p].addEventListener('input',()=>{setPair(p,'ang',n(E['ang'+p]));resetTime()});
+    E['ang'+p+'Input'].addEventListener('input',()=>{setPair(p,'ang',n(E['ang'+p+'Input']));resetTime()});
+    E['x'+p].addEventListener('input',resetTime);E['y'+p].addEventListener('input',resetTime);
+    E['object'+p].addEventListener('change',resetTime);E['mass'+p].addEventListener('change',resetTime);
+  });
+
+  [E.g,E.ground,E.rho,E.dragScale].forEach(x=>x.addEventListener('input',resetTime));
+
+  document.querySelectorAll('[data-nudge]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const [key,delta]=btn.dataset.nudge.split(':'),d=Number(delta),p=key.endsWith('A')?'A':'B',kind=key.startsWith('ang')?'ang':'v';
+      if(p==='B'&&kind==='v'&&syncLanding)return;
+      const current=kind==='ang'?n(E['ang'+p]):n(E['v'+p]);
+      setPair(p,kind,current+d);resetTime();
+    });
+  });
+
+  bindPad('A');bindPad('B');syncPad('A');syncPad('B');
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
